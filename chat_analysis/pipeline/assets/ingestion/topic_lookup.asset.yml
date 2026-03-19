@@ -1,0 +1,14 @@
+name: ingestion.topic_lookup
+type: duckdb.seed
+
+parameters:
+    path: topic_lookup.csv
+
+columns:
+  - name: topic_id
+    type: integer
+    primary_key: true
+    description: Unique identifier for the topic
+  - name: topic
+    type: string
+    description: The human-readable name of the topic

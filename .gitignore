@@ -1,0 +1,17 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+.bruin.yml
+logs/runs
+logs/*.log
+*.py[cod]
+logs/queries
+duckdb.db
