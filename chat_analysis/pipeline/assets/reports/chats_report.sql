@@ -1,7 +1,7 @@
 /* @bruin
 
 name: reports.chats_report
-type: duckdb.sql
+type: bq.sql
 
 materialization:
   type: table
@@ -13,7 +13,7 @@ depends:
   - staging.chats
 
 columns:
-  - name: user
+  - name: "`user`"
     type: VARCHAR
     description: Unique user identifier
     primary_key: true
@@ -34,7 +34,7 @@ columns:
 @bruin */
 
 SELECT 
-    user,
+    `user`,
     topic,
     CAST(created_at AS DATE) AS created_date,
     COUNT(*) AS message_count

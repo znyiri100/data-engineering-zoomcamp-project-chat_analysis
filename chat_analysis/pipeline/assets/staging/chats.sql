@@ -1,7 +1,7 @@
 /* @bruin
 
 name: staging.chats
-type: duckdb.sql
+type: bq.sql
 
 depends:
   - ingestion.chats
@@ -29,7 +29,7 @@ columns:
 
 SELECT 
     c.id,
-    c.user,
+    c.`user`,
     l.topic,
     c.created_at,
     c.attempt,
@@ -39,4 +39,4 @@ FROM ingestion.chats c
 LEFT JOIN ingestion.topic_lookup l ON c.topic_id = l.topic_id
 WHERE c.created_at >= '{{ start_datetime }}'
   AND c.created_at < '{{ end_datetime }}'
-  AND (l.topic IN (SELECT UNNEST(['{{ var.chat_types | join("','") }}'])) OR {{ var.chat_types | length }} = 0)
+  AND (l.topic IN UNNEST(['{{ var.chat_types | join("','") }}']) OR {{ var.chat_types | length }} = 0)

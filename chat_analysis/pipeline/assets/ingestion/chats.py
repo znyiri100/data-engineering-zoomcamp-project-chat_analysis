@@ -2,7 +2,7 @@
 name: ingestion.chats
 type: python
 image: python:3.11
-connection: duckdb-default
+connection: bigquery-default
 materialization:
   type: table
   strategy: append
@@ -38,10 +38,14 @@ columns:
 
 @bruin"""
 
+import io
 import os
-from pathlib import Path
 
 import pandas as pd
+from google.cloud import storage
+
+
+GCS_BUCKET = os.getenv("GCS_BUCKET", "chat-analysis-data-kestra-sandbox")
 
 
 def materialize():
@@ -50,17 +54,24 @@ def materialize():
     run_start = pd.to_datetime(start_date, utc=True)
     run_end = pd.to_datetime(end_date, utc=True)
 
-    data_root = Path(os.getenv("CHAT_DATA_DIR", Path(__file__).resolve().parents[4] / "data"))
     month_end = (run_end - pd.Timedelta(seconds=1)).to_period("M")
     month_starts = pd.period_range(start=run_start.to_period("M"), end=month_end, freq="M")
 
+    client = storage.Client()
+    bucket = client.bucket(GCS_BUCKET)
+
     frames = []
     for month in month_starts:
-        month_file = data_root / f"{month}.csv"
-        if month_file.exists():
-            frame = pd.read_csv(month_file, parse_dates=["createdAt"])
+        blob_name = f"data/{month}.csv"
+        blob = bucket.blob(blob_name)
+        if blob.exists():
+            csv_bytes = blob.download_as_bytes()
+            frame = pd.read_csv(io.BytesIO(csv_bytes), parse_dates=["createdAt"])
             frame["createdAt"] = pd.to_datetime(frame["createdAt"], utc=True, errors="coerce")
             frames.append(frame)
+            print(f"Loaded {blob_name} ({len(frame)} rows)")
+        else:
+            print(f"Skipping {blob_name} (not found)")
 
     if frames:
         df = pd.concat(frames, ignore_index=True, copy=False)
@@ -68,5 +79,8 @@ def materialize():
     else:
         df = pd.DataFrame(columns=["user", "topic_id", "id", "createdAt", "attempt", "response", "userMessage"])
 
+    df = df.rename(columns={"createdAt": "created_at", "userMessage": "user_message"})
     df["extracted_at"] = pd.Timestamp.now(tz="UTC")
+
+    print(f"Returning {len(df)} rows for materialization")
     return df

@@ -1,5 +1,5 @@
 name: ingestion.topic_lookup
-type: duckdb.seed
+type: bq.seed
 
 parameters:
     path: topic_lookup.csv
