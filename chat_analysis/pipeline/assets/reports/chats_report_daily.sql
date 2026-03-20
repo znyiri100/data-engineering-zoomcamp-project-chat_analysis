@@ -1,12 +1,12 @@
 /* @bruin
 
-name: reports.chats_report
+name: reports.chats_report_daily
 type: bq.sql
 
 materialization:
   type: table
   strategy: time_interval
-  incremental_key: created_date
+  incremental_key: report_day
   time_granularity: date
 
 depends:
@@ -21,7 +21,7 @@ columns:
     type: VARCHAR
     description: The conversation topic
     primary_key: true
-  - name: created_date
+  - name: report_day
     type: DATE
     description: The date the messages were sent
     primary_key: true
@@ -34,9 +34,9 @@ columns:
 @bruin */
 
 SELECT 
+    FORMAT_DATE('%Y-%m-%d', CAST(created_at AS DATE)) AS report_day,
     `user`,
     topic,
-    CAST(created_at AS DATE) AS created_date,
     COUNT(*) AS message_count
 FROM staging.chats
 WHERE created_at >= '{{ start_datetime }}'
