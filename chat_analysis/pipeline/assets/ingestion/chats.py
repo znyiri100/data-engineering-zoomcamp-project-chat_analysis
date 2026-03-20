@@ -3,6 +3,11 @@ name: ingestion.chats
 type: python
 image: python:3.11
 connection: bigquery-default
+
+secrets:
+  - key: bigquery-default
+    inject_as: GCP_CREDENTIALS
+
 materialization:
   type: table
   strategy: append
@@ -39,13 +44,27 @@ columns:
 @bruin"""
 
 import io
+import json
 import os
 
 import pandas as pd
 from google.cloud import storage
+from google.oauth2 import service_account
 
 
 GCS_BUCKET = os.getenv("GCS_BUCKET", "chat-analysis-data-kestra-sandbox")
+
+
+def _get_storage_client():
+    """Create a GCS client using Bruin-injected credentials, or fall back to ADC."""
+    creds_json = os.environ.get("GCP_CREDENTIALS")
+    if creds_json:
+        conn = json.loads(creds_json)
+        sa_info = json.loads(conn["service_account_json"])
+        credentials = service_account.Credentials.from_service_account_info(sa_info)
+        return storage.Client(credentials=credentials, project=conn.get("project_id"))
+    # Fall back to Application Default Credentials (local dev)
+    return storage.Client()
 
 
 def materialize():
@@ -57,7 +76,7 @@ def materialize():
     month_end = (run_end - pd.Timedelta(seconds=1)).to_period("M")
     month_starts = pd.period_range(start=run_start.to_period("M"), end=month_end, freq="M")
 
-    client = storage.Client()
+    client = _get_storage_client()
     bucket = client.bucket(GCS_BUCKET)
 
     frames = []
