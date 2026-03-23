@@ -8,9 +8,9 @@
 
 set -euo pipefail
 
-BUCKET_NAME="${1:-chat-analysis-data-kestra-sandbox}"
-PROJECT_ID="kestra-sandbox-8656"
-REGION="us-central1"
+BUCKET_NAME="${1:-${GCS_BUCKET}}"
+PROJECT_ID="${PROJECT_ID}"
+REGION="US"
 GITHUB_RAW="https://raw.githubusercontent.com/znyiri100/data-engineering-zoomcamp-project-chat_analysis/main/data"
 TMP_DIR=$(mktemp -d)
 

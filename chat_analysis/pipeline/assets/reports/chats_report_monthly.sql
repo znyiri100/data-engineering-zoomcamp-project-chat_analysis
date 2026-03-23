@@ -1,6 +1,6 @@
 /* @bruin
 
-name: reports.chats_report_monthly
+name: chat_analysis_dataset.reports_chats_report_monthly
 type: bq.sql
 
 materialization:
@@ -9,7 +9,7 @@ materialization:
   incremental_key: report_month
 
 depends:
-  - staging.chats
+  - chat_analysis_dataset.staging_chats
 
 columns:
   - name: report_month
@@ -37,7 +37,7 @@ SELECT
     `user`,
     topic,
     COUNT(*) AS message_count
-FROM staging.chats
+FROM chat_analysis_dataset.staging_chats
 WHERE created_at >= TIMESTAMP_TRUNC(CAST('{{ start_datetime }}' AS TIMESTAMP), MONTH)
   -- AND created_at <  CAST(DATE_ADD(CAST(TIMESTAMP_TRUNC(CAST('{{ start_datetime }}' AS TIMESTAMP), MONTH) AS DATE), INTERVAL 1 MONTH) AS TIMESTAMP)
   AND created_at <  TIMESTAMP_TRUNC(CAST('{{ end_datetime }}' AS TIMESTAMP), MONTH)

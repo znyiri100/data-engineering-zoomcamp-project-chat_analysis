@@ -1,5 +1,5 @@
 """@bruin
-name: ingestion.chats
+name: chat_analysis_dataset.ingestion_chats
 type: python
 image: python:3.11
 connection: bigquery-default
@@ -52,7 +52,7 @@ from google.cloud import storage
 from google.oauth2 import service_account
 
 
-GCS_BUCKET = os.getenv("GCS_BUCKET", "chat-analysis-data-kestra-sandbox")
+GCS_BUCKET = os.getenv("GCS_BUCKET")
 
 
 def _get_storage_client():
@@ -60,10 +60,11 @@ def _get_storage_client():
     creds_json = os.environ.get("GCP_CREDENTIALS")
     if creds_json:
         conn = json.loads(creds_json)
-        sa_info = json.loads(conn["service_account_json"])
-        credentials = service_account.Credentials.from_service_account_info(sa_info)
-        return storage.Client(credentials=credentials, project=conn.get("project_id"))
-    # Fall back to Application Default Credentials (local dev)
+        sa_json = conn.get("service_account_json", "")
+        if sa_json:
+            credentials = service_account.Credentials.from_service_account_info(json.loads(sa_json))
+            return storage.Client(credentials=credentials, project=conn.get("project_id"))
+    # Fall back to Application Default Credentials (local dev / use_application_default_credentials)
     return storage.Client()
 
 

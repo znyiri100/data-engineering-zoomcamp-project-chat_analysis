@@ -1,6 +1,6 @@
 /* @bruin
 
-name: reports.chats_report_daily
+name: chat_analysis_dataset.reports_chats_report_daily
 type: bq.sql
 
 materialization:
@@ -10,7 +10,7 @@ materialization:
   time_granularity: date
 
 depends:
-  - staging.chats
+  - chat_analysis_dataset.staging_chats
 
 columns:
   - name: "`user`"
@@ -38,7 +38,7 @@ SELECT
     `user`,
     topic,
     COUNT(*) AS message_count
-FROM staging.chats
+FROM chat_analysis_dataset.staging_chats
 WHERE created_at >= '{{ start_datetime }}'
   AND created_at < '{{ end_datetime }}'
 GROUP BY 1, 2, 3

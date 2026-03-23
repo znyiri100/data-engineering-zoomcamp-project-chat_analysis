@@ -1,8 +1,8 @@
-name: ingestion.topic_lookup
+name: chat_analysis_dataset.ingestion_topic_lookup
 type: bq.seed
 
 parameters:
-    path: topic_lookup.csv
+  path: topic_lookup.csv
 
 columns:
   - name: topic_id
