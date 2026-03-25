@@ -100,6 +100,13 @@ cp .env.example .env
 Fill in the `.env` with: `TF_VAR_project`, `TF_VAR_billing_account_id`. 
 Note: The `.env` file is excluded in `.gitignore` so your billing ID and credentials will not be accidentally committed to Git.
 
+> [!IMPORTANT]
+> **Bruin IDE Extension Compatibility:**
+> The Bruin extension for VS Code/Cursor uses a standard `.env` parser that **does not support bash variable interpolation** (e.g., `${TF_VAR_project}`). 
+> It also expects dotenv syntax (`KEY=VALUE`), not `export KEY=VALUE`.
+> To avoid `404: Not Found` errors when running queries in the extension, ensure that `PROJECT_ID`, `GCS_BUCKET`, and `GOOGLE_CLOUD_PROJECT` are set as **hardcoded string literals** in your `.env` file.
+
+
 ### 3. Apply Terraform Infrastructure
 To set up your environment, Terraform will create your GCP project, link it to billing, enable necessary APIs, create your service account and key, and finally create the GCS Bucket and BigQuery dataset.
 
@@ -115,7 +122,7 @@ gcloud auth application-default login
    ```
 2. Run the Terraform lifecycle commands (variables are automatically loaded from `TF_VAR_` env vars in `.env`):
    ```bash
-   source ../.env
+   set -a; source ../.env; set +a
    terraform init
    terraform plan
    terraform apply -auto-approve
@@ -145,7 +152,7 @@ Login with newly created service account
 If you wish to cleanly tear down the entire environment (including the GCP project, bucket, dataset, and service accounts), you can use Terraform:
 ```bash
 cd terraform
-source ../.env
+set -a; source ../.env; set +a
 terraform destroy -auto-approve
 ```
 
@@ -190,6 +197,7 @@ Before running, you can validate your pipeline's SQL, Python, and YAML assets fo
 ```bash
 # Navigate to your chat_analysis folder holding the code for Bruin
 cd chat_analysis
+set -a; source ../.env; set +a
 bruin validate ./pipeline/pipeline.yml
 ```
 
@@ -198,9 +206,12 @@ To run the full end-to-end pipeline (ingestion -> staging -> reports) for a spec
 ```bash
 # Run the pipeline for a specific date range
 bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2026-01-01 --end-date 2026-02-01
-bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2025-01-01 
-  # --var chat_types='["free", "assessment_test"]'
+# full-refresh
+bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2025-01-01
+# full-refresh with variable
+bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2025-01-01 --var chat_types='["free", "assessment_test"]'
 ```
+
 The first step of the pipeline automatically executes `upload_to_gcs.py`, which pulls the CSVs from GitHub and uploads them to your GCS Bucket as part of the ingestion phase. Because it's running with `--full-refresh`, all data will be forcefully re-uploaded and replaced.
 
 ### 4. Querying the Results

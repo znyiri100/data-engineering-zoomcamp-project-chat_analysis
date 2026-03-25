@@ -40,7 +40,6 @@ columns:
   - name: extracted_at
     type: timestamp
     description: UTC extraction timestamp
-
 @bruin"""
 
 import io
