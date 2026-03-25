@@ -2,6 +2,14 @@ variable "project" {
   description = "Your GCP Project ID"
 }
 
+variable "billing_account_id" {
+  description = "The GCP billing account ID"
+}
+
+variable "sa_name" {
+  description = "The name for the Terraform service account"
+}
+
 variable "region" {
   description = "Region for GCP resources"
   default     = "us-central1"

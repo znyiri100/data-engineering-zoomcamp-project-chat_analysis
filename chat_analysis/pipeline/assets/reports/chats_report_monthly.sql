@@ -1,20 +1,24 @@
 /* @bruin
 
-name: chat_analysis_dataset.reports_chats_report_monthly
+name: chat_analysis_2026_dataset.reports_chats_report_monthly
 type: bq.sql
 
 materialization:
   type: table
   strategy: delete+insert
   incremental_key: report_month
+  partition_by: DATE_TRUNC(report_month, MONTH)
+  cluster_by:
+    - "`user`"
+    - topic
 
 depends:
-  - chat_analysis_dataset.staging_chats
+  - chat_analysis_2026_dataset.staging_chats
 
 columns:
   - name: report_month
-    type: STRING
-    description: The month of the report in YYYY-MM format
+    type: DATE
+    description: The month of the report (first day of the month)
     primary_key: true
   - name: "`user`"
     type: STRING
@@ -33,11 +37,11 @@ columns:
 @bruin */
 
 SELECT 
-    FORMAT_DATE('%Y-%m', CAST(created_at AS DATE)) AS report_month,
+    DATE_TRUNC(CAST(created_at AS DATE), MONTH) AS report_month,
     `user`,
     topic,
     COUNT(*) AS message_count
-FROM chat_analysis_dataset.staging_chats
+FROM chat_analysis_2026_dataset.staging_chats
 WHERE created_at >= TIMESTAMP_TRUNC(CAST('{{ start_datetime }}' AS TIMESTAMP), MONTH)
   -- AND created_at <  CAST(DATE_ADD(CAST(TIMESTAMP_TRUNC(CAST('{{ start_datetime }}' AS TIMESTAMP), MONTH) AS DATE), INTERVAL 1 MONTH) AS TIMESTAMP)
   AND created_at <  TIMESTAMP_TRUNC(CAST('{{ end_datetime }}' AS TIMESTAMP), MONTH)

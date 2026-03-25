@@ -1,10 +1,10 @@
 # Data Engineering Zoomcamp Project: Chat Analysis
 
 ## Table of Contents
-- [Clone the Repository](#clone-the-repository)
 - [Project Overview and Data](#project-overview-and-data)
 - [Architecture & Tech Stack](#architecture--tech-stack)
-- [Setting up GCP & Terraform](#setting-up-gcp--terraform)
+- [Clone the Repository](#clone-the-repository)
+- [Setting up GCP & Terraform](#setting-up-gcp-with-terraform)
 - [Uploading Data to GCS](#uploading-data-to-gcs)
 - [Setting up and Using Bruin](#setting-up-and-using-bruin)
 - [Dashboard & Optimizations](#dashboard--optimizations)
@@ -85,7 +85,7 @@ cd data-engineering-zoomcamp-project-chat_analysis
 
 ## Setting up GCP with Terraform
 
-We will clone the repository, create a brand new Google Cloud project, link it to an existing billing account, and use Terraform to set up a BigQuery dataset and Google Cloud Storage bucket.
+We will create a new Google Cloud project, link it to an existing billing account, and use Terraform to set up a BigQuery dataset and Google Cloud Storage bucket.
 
 ### 1. Prerequisites
 - [Google Cloud SDK (gcloud)](https://cloud.google.com/sdk/docs/install) installed and authenticated.
@@ -97,129 +97,77 @@ Copy the `.env.example` file to `.env`:
 ```bash
 cp .env.example .env
 ```
-Fill in the `.env` with your unique `PROJECT_ID`, `SA_NAME`, and your GCP `BILLING_ACCOUNT_ID`. Note: The `.env` file is excluded in `.gitignore` so your billing ID and credentials will not be accidentally committed to Git.
+Fill in the `.env` with: `TF_VAR_project`, `TF_VAR_billing_account_id`. 
+Note: The `.env` file is excluded in `.gitignore` so your billing ID and credentials will not be accidentally committed to Git.
 
-### 3. Run the GCP Initialization Script
-We need to create the project, link it to billing, enable necessary APIs, and create the service account for Terraform. You can do this by running the following commands (after loading your `.env`):
+### 3. Apply Terraform Infrastructure
+To set up your environment, Terraform will create your GCP project, link it to billing, enable necessary APIs, create your service account and key, and finally create the GCS Bucket and BigQuery dataset.
 
+Before running Terraform, ensure you authenticate with your personal Google account so Terraform can bootstrap the environment:
 ```bash
-# Load your local variables
-source .env
-
-# check active account
-gcloud auth list
-
-# Create the new project
-gcloud projects create $PROJECT_ID --name=$PROJECT_ID
-
-# Link the new project to your existing billing account
-gcloud beta billing projects link $PROJECT_ID --billing-account=$BILLING_ACCOUNT_ID
-
-# Check if the project is linked to the billing account
-gcloud projects list
-gcloud billing projects list --billing-account=$BILLING_ACCOUNT_ID
-
-# Enable necessary APIs (Storage, BigQuery, IAM, Resource Manager)
-gcloud services enable \
-  iam.googleapis.com \
-  cloudresourcemanager.googleapis.com \
-  bigquery.googleapis.com \
-  storage.googleapis.com \
-  --project $PROJECT_ID
-
-# Check enabled API-s
-gcloud services list --enabled --project $PROJECT_ID
-
-# Create a Service Account for Terraform
-gcloud iam service-accounts create $SA_NAME \
-  --display-name=$SA_NAME \
-  --project $PROJECT_ID
-
-# Grant necessary roles to the Service Account
-export SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
-
-for role in roles/storage.admin roles/bigquery.dataEditor roles/bigquery.jobUser; do
-  gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SA_EMAIL" \
-    --role="$role"
-done
-
-# check roles
-gcloud projects get-iam-policy "$PROJECT_ID" --flatten="bindings[].members" --filter="bindings.members:serviceAccount:$SA_EMAIL" --format="table(bindings.role)"
-
-# Disable the Policy Constraint preventing service account key creation
-cat <<EOF > /tmp/disable_key_creation_policy.yaml
-name: projects/$PROJECT_ID/policies/iam.disableServiceAccountKeyCreation
-spec:
-  rules:
-  - enforce: false
-EOF
-gcloud org-policies set-policy /tmp/disable_key_creation_policy.yaml
-
-# Generate the JSON credentials key and download it
-gcloud iam service-accounts keys create .credentials.json \
-  --iam-account=$SA_EMAIL \
-  --project $PROJECT_ID
-
-# Set up credentials environment variable (if not already in .env)
-# The .env.example already contains export GOOGLE_APPLICATION_CREDENTIALS=".credentials.json"
-source .env
+# Login to GCP with ADC (Application Default Credentials)
+gcloud auth application-default login
 ```
 
-### 4. Apply Terraform Infrastructure
-Now that your GCP environment is initialized and your `GOOGLE_APPLICATION_CREDENTIALS` are set, you can spin up the infrastructure:
-
-1. Navigate to your terraform folder. You should have `main.tf` and `variables.tf` files available.
+1. Navigate to your terraform folder:
+   ```bash
+   cd terraform
+   ```
 2. Run the Terraform lifecycle commands (variables are automatically loaded from `TF_VAR_` env vars in `.env`):
    ```bash
+   source ../.env
    terraform init
    terraform plan
    terraform apply -auto-approve
-   terraform show
    ```
+
+Upon a successful apply, Terraform will output your new Project ID, Service Account email, Bucket Name, Dataset ID, and the location of your downloaded `.credentials.json` file.
+
+   ```bash
+   Apply complete! Resources: 6 added, 1 changed, 0 destroyed.
+
+   Outputs:
+
+   bigquery_dataset = "chat_analysis_2026_dataset"
+   credentials_file = "./../.credentials.json"
+   project_id = "chat-analysis-2026"
+   service_account_email = "chat-analysis-2026-sa@chat-analysis-2026.iam.gserviceaccount.com"
+   storage_bucket = "chat-analysis-2026_bucket"
+   ```
+
+Login with newly created service account
+   ```bash
+   gcloud auth list
+   gcloud config set account <service-account-email>
+   ```
+
+### 4. Tear Down Infrastructure
+If you wish to cleanly tear down the entire environment (including the GCP project, bucket, dataset, and service accounts), you can use Terraform:
+```bash
+cd terraform
+source ../.env
+terraform destroy -auto-approve
+```
 
 ## Extracting Data from Local Database (Optional)
 
-If you have your raw chat data residing in a local MySQL/MariaDB Docker container (e.g., `japi-mysql`), you can extract it directly into the `data/` directory using the provided Python script:
+The source data resides in a local MySQL/MariaDB Docker container. It is a copy of our production environment, I can't give access to it, so I extracted chat messages for 200 demo users using this script:
 
 ```bash
+# export data from local database to csv files
 python export_data.py
 ```
 
-This script extracts user chat logs, groups them by month into CSV files (e.g., `2025-05.csv`), and generates a `topic_lookup.csv` file, placing them all in the `data/` directory. If you just want to run the pipeline, the `upload_to_gcs.sh` script in the next step will download pre-extracted data from GitHub.
+This script extracts user chat logs, groups them by month into CSV files (e.g., `2025-05.csv`), and generates a `topic_lookup.csv` file. I have uploaded them to the project github repository under `data/` directory to support reproducing the same results.
 
-## Uploading Data to GCS
+## Uploading Data to GCS (Automated via Bruin)
 
-Before running the Bruin ingestion pipeline, the raw CSV chat data must be uploaded to your GCS bucket. The `upload_to_gcs.sh` script automates downloading the source files from GitHub and uploading them to GCS.
+The raw CSV chat data must be uploaded to your GCS bucket before BigQuery can process it. 
+This is handled automatically by the Bruin pipeline! 
 
-### Prerequisites
-- `gcloud` CLI authenticated and project set (`gcloud config set project $PROJECT_ID`)
-- `wget` installed
-- Your `.env` loaded (`source .env`) so that `GCS_BUCKET` and `GOOGLE_APPLICATION_CREDENTIALS` are set
+When you trigger the Bruin pipeline, the `upload_to_gcs.py` Python asset runs the `upload_to_gcs.sh` bash script underneath as the first ingestion step. It pulls the data directly from the GitHub repository `data/` directory and uploads each file to `gs://<BUCKET_NAME>/data/` automatically. 
 
-### Usage
-```bash
-# Load environment variables (sets GCS_BUCKET, PROJECT_ID, credentials)
-source .env
-
-# Upload all monthly CSVs and the topic_lookup table to your GCS bucket
-bash upload_to_gcs.sh "$GCS_BUCKET"
-```
-
-You can also pass the bucket name directly as an argument (defaults to `chat-analysis-data-kestra-sandbox` if omitted):
-```bash
-bash upload_to_gcs.sh my-custom-bucket-name
-```
-
-### What it does
-1. **Creates the GCS bucket** if it doesn't already exist (in `us-central1`, with uniform bucket-level access).
-2. **Downloads** the monthly CSV files (`2025-05.csv` → `2026-02.csv`) and `topic_lookup.csv` from the project's GitHub `data/` directory.
-3. **Uploads** each file to `gs://<BUCKET_NAME>/data/` in your GCS bucket.
-
-### Verify the upload
-```bash
-gcloud storage ls gs://$GCS_BUCKET/data/
-```
+If a file already exists, the script will smartly skip downloading and uploading it. If you trigger the pipeline with `--full-refresh`, it will force an overwrite automatically.
 
 ---
 
@@ -231,6 +179,9 @@ Bruin is a unified CLI tool for data ingestion, transformation, orchestration, a
 Install the Bruin CLI:
 ```bash
 curl -LsSf https://getbruin.com/install/cli | sh
+
+# Verify installation
+bruin -v
 ```
 *(Optional)* Install the Bruin IDE Extension in VS Code or Cursor.
 
@@ -245,16 +196,26 @@ bruin validate ./pipeline/pipeline.yml
 ### 3. Running the Pipeline
 To run the full end-to-end pipeline (ingestion -> staging -> reports) for a specific date range, use the `bruin run` command:
 ```bash
-bruin run ./pipeline/pipeline.yml  --full-refresh
-  # --start-date 2026-01-01
-  # --end-date 2026-02-01
+# Run the pipeline for a specific date range
+bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2026-01-01 --end-date 2026-02-01
+bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2025-01-01 
   # --var chat_types='["free", "assessment_test"]'
 ```
+The first step of the pipeline automatically executes `upload_to_gcs.py`, which pulls the CSVs from GitHub and uploads them to your GCS Bucket as part of the ingestion phase. Because it's running with `--full-refresh`, all data will be forcefully re-uploaded and replaced.
 
 ### 4. Querying the Results
 Once the pipeline has finished running, you can query your data directly through the CLI's `bigquery-default` connection:
 ```bash
-bruin query --connection bigquery-default --query "SELECT * FROM reports.chats_report_monthly LIMIT 3"
+# check sample data
+bruin query --connection bigquery-default --query "SELECT * FROM chat_analysis_2026_dataset.staging_chats LIMIT 3"
+
+# check date range
+bruin query --connection bigquery-default --query "SELECT MIN(created_at), MAX(created_at) FROM chat_analysis_2026_dataset.staging_chats"
+
+# check row counts, should be the same!
+bruin query --connection bigquery-default --query "SELECT count(*)  FROM chat_analysis_2026_dataset.staging_chats"
+bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT)  FROM chat_analysis_2026_dataset.reports_chats_report_daily"
+bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT) FROM chat_analysis_2026_dataset.reports_chats_report_monthly"
 ```
 
 ### Key Commands Reference
@@ -272,8 +233,8 @@ For more advanced deployment instructions and tutorials, check out the `chat_ana
 
 ### Data Warehouse Optimizations
 To ensure cost-efficiency and fast query performance in BigQuery, the resulting reporting tables are optimized using:
-- **Partitioning:** Tables are partitioned by date (e.g., message creation date) to limit the amount of data scanned when reporting on specific months.
-- **Clustering:** Tables are clustered by relevant fields such as `user_id` or `topic` for faster grouped aggregations.
+- **Partitioning:** The `staging_chats` and daily/monthly reporting tables are partitioned by their respective date or timestamp columns (`created_at`, `report_day`, `report_month`) to limit the amount of data scanned.
+- **Clustering:** The tables are clustered by `` `user` `` and `topic` fields for faster grouped aggregations by these dimensions.
 
 ### Dashboard
 *[Looker Studio dashboard](https://lookerstudio.google.com/reporting/a90b07ea-d6c8-475e-8c1c-0d5274c46b9a)*

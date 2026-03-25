@@ -1,5 +1,5 @@
 """@bruin
-name: chat_analysis_dataset.ingestion_chats
+name: chat_analysis_2026_dataset.ingestion_chats
 type: python
 image: python:3.11
 connection: bigquery-default
@@ -12,8 +12,8 @@ materialization:
   type: table
   strategy: append
 
-# depends:
-#   - ingestion.topic_lookup
+depends:
+  - upload_to_gcs
 
 columns:
   - name: user

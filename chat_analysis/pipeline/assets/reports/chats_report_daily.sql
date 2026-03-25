@@ -1,6 +1,6 @@
 /* @bruin
 
-name: chat_analysis_dataset.reports_chats_report_daily
+name: chat_analysis_2026_dataset.reports_chats_report_daily
 type: bq.sql
 
 materialization:
@@ -8,9 +8,13 @@ materialization:
   strategy: time_interval
   incremental_key: report_day
   time_granularity: date
+  partition_by: report_day
+  cluster_by:
+    - "`user`"
+    - topic
 
 depends:
-  - chat_analysis_dataset.staging_chats
+  - chat_analysis_2026_dataset.staging_chats
 
 columns:
   - name: "`user`"
@@ -34,11 +38,11 @@ columns:
 @bruin */
 
 SELECT 
-    FORMAT_DATE('%Y-%m-%d', CAST(created_at AS DATE)) AS report_day,
+    CAST(created_at AS DATE) AS report_day,
     `user`,
     topic,
     COUNT(*) AS message_count
-FROM chat_analysis_dataset.staging_chats
+FROM chat_analysis_2026_dataset.staging_chats
 WHERE created_at >= '{{ start_datetime }}'
   AND created_at < '{{ end_datetime }}'
 GROUP BY 1, 2, 3

@@ -5,10 +5,10 @@ import io
 from datetime import datetime
 
 # Database connection details provided by user
-DOCKER_CONTAINER = "japi-mysql"
-DB_USER = "u-star"
-DB_PASS = "ustar456321"
-DB_NAME = "jadipintar-staging"
+DOCKER_CONTAINER = "XXX"
+DB_USER = "XXX"
+DB_PASS = "XXX"
+DB_NAME = "XXX"
 
 # Query based on user snippets
 # Filter: u.name LIKE 'demo-test%'

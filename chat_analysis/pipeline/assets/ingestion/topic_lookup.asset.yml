@@ -1,8 +1,11 @@
-name: chat_analysis_dataset.ingestion_topic_lookup
+name: chat_analysis_2026_dataset.ingestion_topic_lookup
 type: bq.seed
 
 parameters:
   path: topic_lookup.csv
+
+depends:
+  - upload_to_gcs
 
 columns:
   - name: topic_id

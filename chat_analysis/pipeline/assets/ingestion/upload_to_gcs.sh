@@ -8,7 +8,29 @@
 
 set -euo pipefail
 
-BUCKET_NAME="${1:-${GCS_BUCKET}}"
+FORCE=false
+BUCKET_NAME="${GCS_BUCKET:-}"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -f|--force)
+      FORCE=true
+      shift
+      ;;
+    *)
+      if [[ "$1" != -* ]]; then
+        BUCKET_NAME="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$BUCKET_NAME" ]]; then
+    echo "Usage: ./upload_to_gcs.sh [-f|--force] [BUCKET_NAME]"
+    echo "Error: BUCKET_NAME is required if GCS_BUCKET is not set."
+    exit 1
+fi
 PROJECT_ID="${PROJECT_ID}"
 REGION="US"
 GITHUB_RAW="https://raw.githubusercontent.com/znyiri100/data-engineering-zoomcamp-project-chat_analysis/main/data"
@@ -34,16 +56,12 @@ echo "  Bucket:   gs://$BUCKET_NAME"
 echo "  Source:    $GITHUB_RAW"
 echo ""
 
-# Create bucket if it doesn't exist
+# Check if bucket exists
 if ! gcloud storage buckets describe "gs://$BUCKET_NAME" --project="$PROJECT_ID" &>/dev/null; then
-    echo "Creating bucket gs://$BUCKET_NAME ..."
-    gcloud storage buckets create "gs://$BUCKET_NAME" \
-        --project="$PROJECT_ID" \
-        --location="$REGION" \
-        --uniform-bucket-level-access
-    echo "  ✓ Bucket created"
+    echo "Error: Bucket gs://$BUCKET_NAME does not exist. Please create it first."
+    exit 1
 else
-    echo "  ✓ Bucket already exists"
+    echo "  ✓ Bucket exists"
 fi
 
 # Download from GitHub and upload to GCS
@@ -51,6 +69,11 @@ echo ""
 echo "Downloading from GitHub and uploading to GCS..."
 for filename in "${FILES[@]}"; do
     echo "  $filename ..."
+    if [[ "$FORCE" == "false" ]] && gcloud storage ls "gs://$BUCKET_NAME/data/$filename" &>/dev/null; then
+        echo "    ↳ File already exists. Skipping... (use -f or --force to overwrite)"
+        # continue
+        break   # if file already uploaded, skip the rest of the files
+    fi
     wget -q -O "$TMP_DIR/$filename" "$GITHUB_RAW/$filename"
     gcloud storage cp "$TMP_DIR/$filename" "gs://$BUCKET_NAME/data/$filename"
 done

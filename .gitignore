@@ -16,5 +16,5 @@ logs/*.log
 logs/queries
 duckdb.db
 
-.env
-.credentials.json
+.env*
+.credentials.json*
