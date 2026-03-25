@@ -1,6 +1,6 @@
 /* @bruin
 
-name: chat_analysis_2026_dataset.reports_chats_report_monthly
+name: chat_analysis_2026_dataset.reports_monthly
 type: bq.sql
 
 materialization:

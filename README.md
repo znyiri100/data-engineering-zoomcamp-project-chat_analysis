@@ -18,21 +18,29 @@ This project focuses on analyzing chat history data, which consists of chatbot m
 By analyzing this chat history, we can understand user engagement, identify peak usage periods, and track the adoption rate of the chatbot. This enables the product and marketing teams to make data-driven decisions on where to invest resources for improving the conversational AI experience.
 
 **Data Sources:**
-The source of the chat history data was a transactional MySQL/MariaDB database (`jadipintar-staging`) that powers the chatbot platform. The raw chat logs were extracted from this database into CSV format representing realistic interactions from 200 demo users.
+The project utilizes two primary data sources extracted from a transactional MySQL/MariaDB database (`jadipintar-staging`):
 
-The exported data fields are as follows:
-- `user`: Account name of the user interacting with the chatbot
-- `topic_id`: System identifier for the conversation topic
-- `id`: Unique identifier for the chat message entry
-- `createdAt`: Timestamp indicating when the message was sent
-- `attempt`: Current attempt count for the specific conversation/topic
-- `response`: The chatbot's generated reply
-- `userMessage`: The input message sent by the user
+1.  **Chat Logs:** Raw conversation logs representing realistic interactions from 200 demo users.
+    - `id`: Unique identifier for the chat message entry (Primary Key)
+    - `user`: Account name of the user interacting with the chatbot
+    - `topic_id`: System identifier for the conversation topic (Foreign Key)
+    - `createdAt`: Timestamp indicating when the message was sent
+    - `attempt`: Current attempt count for the specific conversation/topic
+    - `response`: The chatbot's generated reply
+    - `userMessage`: The input message sent by the user
+
+2.  **Topic Lookup:** A lookup table mapping system IDs to human-readable topic names.
+    - `topic_id`: Unique identifier for the topic (Primary Key)
+    - `topic`: The human-readable name of the topic (e.g., "assessment_test", or "free" for interaction with the chatbot about anything)
+
+**Data Connection:**
+In the staging layer of the pipeline, the **Chat Logs** are joined with the **Topic Lookup** table on the `topic_id` field. This enrichment allows the final reports and dashboard to display analysis by human-readable topic names instead of raw system IDs.
 
 **Our primary tasks and analytical goals are to:**
 - **Process and transform raw chatbot conversation logs.**
 - **Calculate Message Volume:** Report the total message volume per user, and by month.
 - **Track Active Users:** Report the number of active users interacting with the chatbot over time.
+- **Analyze Conversations (Sessionization):** Group individual messages into distinct conversation sessions to track session length, message count per session, and topic-specific engagement.
 
 ## Architecture & Tech Stack
 
@@ -50,10 +58,10 @@ The exported data fields are as follows:
 └──────────────────────┬───────────────────┘
                        │
                        ▼
-┌──────────────────────────────────────────┐
 │   BigQuery (Data Warehouse) via Bruin    │
 │  - Staging layer (cleaning data)         │
-│  - Reporting layer (fact models)         │
+│  - Reporting layer (agg. daily/monthly)  │
+│  - Conversation layer (sessionization)   │
 │  - Partitioned & Clustered tables        │
 └──────────────────────┬───────────────────┘
                        │
@@ -244,15 +252,15 @@ For more advanced deployment instructions and tutorials, check out the `chat_ana
 
 ### Data Warehouse Optimizations
 To ensure cost-efficiency and fast query performance in BigQuery, the resulting reporting tables are optimized using:
-- **Partitioning:** The `staging_chats` and daily/monthly reporting tables are partitioned by their respective date or timestamp columns (`created_at`, `report_day`, `report_month`) to limit the amount of data scanned.
-- **Clustering:** The tables are clustered by `` `user` `` and `topic` fields for faster grouped aggregations by these dimensions.
+- **Partitioning:** The `staging_chats`, `reporting_chats_report_daily`, `reporting_chats_report_monthly`, and `reports_chats_report_convo` tables are partitioned by their respective date or timestamp columns (`created_at`, `report_day`, `report_month`) to limit the amount of data scanned.
+- **Clustering:** The tables are clustered by `` `user` `` and `topic` fields (and additionally `conversation_id` for the conversations report) for faster grouped aggregations by these dimensions.
 
 ### Dashboard
 *[Looker Studio dashboard](https://lookerstudio.google.com/reporting/a90b07ea-d6c8-475e-8c1c-0d5274c46b9a)*
 
 The dashboard visualizes:
-- **Message Volume:** Bar charts displaying total message volume per user and aggregated by month.
 - **Active User Trends:** Line charts showing the growth or retention of active users interacting with the chatbot over time.
+- **Conversation Insights:** Visualizations revealing average conversation length, messages per session, and topic-specific interaction depth.
 
 ## Future Improvements
 - **Incremental Processing:** Parameterize the pipeline to only process new data (incremental loads) rather than full refreshes.
