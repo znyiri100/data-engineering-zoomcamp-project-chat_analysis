@@ -1,6 +1,9 @@
 """@bruin
 name: upload_to_gcs
 type: python
+secrets:
+  - key: GCS_BUCKET
+  - key: PROJECT_ID
 @bruin"""
 
 import subprocess
@@ -13,9 +16,9 @@ def main():
     
     cmd = ["bash", script_path]
     
-    if os.environ.get("BRUIN_FULL_REFRESH") == "1":
-        print("Running with --force due to full refresh.")
-        #cmd.append("--force")
+    # if os.environ.get("BRUIN_FULL_REFRESH") == "1":
+    #     print("Running with --force due to full refresh.")
+    #     #cmd.append("--force")
 
     print(f"Executing: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=root_dir)
