@@ -12,6 +12,9 @@ columns:
     type: integer
     primary_key: true
     description: Unique identifier for the topic
+    checks:
+      - name: not_null
+      - name: unique
   - name: topic
     type: string
     description: The human-readable name of the topic

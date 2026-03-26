@@ -20,12 +20,16 @@ columns:
   - name: user
     type: string
     description: User identifier
+    checks:
+      - name: not_null
   - name: topic_id
     type: integer
     description: Unique identifier for the topic
   - name: id
     type: integer
     description: Chat message id
+    checks:
+      - name: not_null
   - name: created_at
     type: timestamp
     description: Message creation timestamp

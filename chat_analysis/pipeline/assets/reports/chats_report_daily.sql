@@ -16,6 +16,19 @@ materialization:
 depends:
   - chat_analysis_2026_dataset.staging_chats
 
+custom_checks:
+  - name: unique_user_topic_day
+    description: Ensure each user has only one record per topic per day
+    query: |
+      SELECT count(*)
+      FROM (
+          SELECT `user`, topic, report_day
+          FROM chat_analysis_2026_dataset.reports_chats_report_daily
+          GROUP BY 1, 2, 3
+          HAVING count(*) > 1
+      )
+    value: 0
+
 columns:
   - name: "`user`"
     type: VARCHAR

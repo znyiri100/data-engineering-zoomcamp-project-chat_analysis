@@ -15,6 +15,19 @@ materialization:
 depends:
   - chat_analysis_2026_dataset.staging_chats
 
+custom_checks:
+  - name: unique_user_topic_month
+    description: Ensure each user has only one record per topic per month
+    query: |
+      SELECT count(*)
+      FROM (
+          SELECT `user`, topic, report_month
+          FROM chat_analysis_2026_dataset.reports_chats_report_monthly
+          GROUP BY 1, 2, 3
+          HAVING count(*) > 1
+      )
+    value: 0
+
 columns:
   - name: report_month
     type: DATE
