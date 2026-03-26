@@ -57,7 +57,7 @@ echo "  Source:    $GITHUB_RAW"
 echo ""
 
 # Check if bucket exists
-if ! gcloud storage buckets describe "gs://$BUCKET_NAME" --project="$PROJECT_ID" &>/dev/null; then
+if ! gcloud storage buckets describe "gs://$BUCKET_NAME" --project="$PROJECT_ID"; then
     echo "Error: Bucket gs://$BUCKET_NAME does not exist. Please create it first."
     exit 1
 else
