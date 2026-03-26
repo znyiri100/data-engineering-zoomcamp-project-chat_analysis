@@ -5,6 +5,7 @@ image: python:3.11
 connection: bigquery-default
 
 secrets:
+  - key: GCS_BUCKET
   - key: bigquery-default
     inject_as: GCP_CREDENTIALS
 
@@ -68,6 +69,9 @@ def _get_storage_client():
 
 
 def materialize():
+    if not GCS_BUCKET:
+        raise ValueError("GCS_BUCKET is not set. Add it as a Bruin secret for this asset/environment.")
+
     start_date = os.environ["BRUIN_START_DATE"]
     end_date = os.environ["BRUIN_END_DATE"]
     run_start = pd.to_datetime(start_date, utc=True)
