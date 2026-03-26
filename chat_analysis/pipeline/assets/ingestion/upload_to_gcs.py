@@ -1,15 +1,20 @@
 """@bruin
 name: upload_to_gcs
 type: python
+connection: bigquery-default
 secrets:
   - key: GCS_BUCKET
   - key: PROJECT_ID
+  - key: bigquery-default
+    inject_as: GCS_CONNECTION
 @bruin"""
 
 import os
 import sys
+import json
 import requests
 from google.cloud import storage
+from google.oauth2 import service_account
 
 # CSV files to download (monthly chat data + lookup table)
 FILES = [
@@ -26,6 +31,24 @@ FILES = [
 ]
 
 GITHUB_RAW = "https://raw.githubusercontent.com/znyiri100/data-engineering-zoomcamp-project-chat_analysis/main/data"
+
+def _get_storage_client(project_id: str | None):
+    """
+    Create a GCS client using Bruin-injected connection JSON when available.
+    Falls back to local credentials / ADC for local development.
+    """
+    conn_json = os.environ.get("GCS_CONNECTION")
+    if conn_json:
+        try:
+            conn = json.loads(conn_json)
+            sa_json = conn.get("service_account_json", "")
+            if sa_json:
+                credentials = service_account.Credentials.from_service_account_info(json.loads(sa_json))
+                return storage.Client(credentials=credentials, project=project_id or conn.get("project_id"))
+        except Exception as exc:
+            print(f"Warning: Failed to parse GCS_CONNECTION, falling back to ADC. Details: {exc}")
+
+    return storage.Client(project=project_id)
 
 def main():
     bucket_name = os.environ.get("GCS_BUCKET")
@@ -51,7 +74,7 @@ def main():
     print(f"  Source:   {GITHUB_RAW}\n")
 
     try:
-        storage_client = storage.Client(project=project_id)
+        storage_client = _get_storage_client(project_id)
         bucket = storage_client.bucket(bucket_name)
         
         # Verify bucket access
