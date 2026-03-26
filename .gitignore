@@ -18,3 +18,8 @@ duckdb.db
 
 .env*
 .credentials.json*
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/.terraform.lock.hcl
