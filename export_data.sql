@@ -1,6 +1,6 @@
-SELECT id, COUNT(*) as cnt FROM `jadipintar-staging`.learning_journey_chapter GROUP BY id;
+SELECT id, COUNT(*) as cnt FROM `XXX`.learning_journey_chapter GROUP BY id;
 
-use `jadipintar-staging`
+use `XXX`
 
 select id,name, email from users where email like '%nyiri%'
 

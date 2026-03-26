@@ -7,6 +7,7 @@
 - [Setting up GCP & Terraform](#setting-up-gcp-with-terraform)
 - [Uploading Data to GCS](#uploading-data-to-gcs)
 - [Setting up and Using Bruin](#setting-up-and-using-bruin)
+- [Deploying to Bruin Cloud](#deploying-to-bruin-cloud)
 - [Dashboard & Optimizations](#dashboard--optimizations)
 - [Future Improvements](#future-improvements)
 
@@ -18,7 +19,7 @@ This project focuses on analyzing chat history data, which consists of chatbot m
 By analyzing this chat history, we can understand user engagement, identify peak usage periods, and track the adoption rate of the chatbot. This enables the product and marketing teams to make data-driven decisions on where to invest resources for improving the conversational AI experience.
 
 **Data Sources:**
-The project utilizes two primary data sources extracted from a transactional MySQL/MariaDB database (`jadipintar-staging`):
+The project utilizes two primary data sources extracted from a transactional MySQL/MariaDB database:
 
 1.  **Chat Logs:** Raw conversation logs representing realistic interactions from 200 demo users.
     - `id`: Unique identifier for the chat message entry (Primary Key)
@@ -38,8 +39,8 @@ In the staging layer of the pipeline, the **Chat Logs** are joined with the **To
 
 **Our primary tasks and analytical goals are to:**
 - **Process and transform raw chatbot conversation logs.**
-- **Calculate Message Volume:** Report the total message volume per user, and by month.
 - **Track Active Users:** Report the number of active users interacting with the chatbot over time.
+- **Calculate Message Volume:** Report the total message volume per user, and by month.
 - **Analyze Conversations (Sessionization):** Group individual messages into distinct conversation sessions to track session length, message count per session, and topic-specific engagement.
 
 ## Architecture & Tech Stack
@@ -58,6 +59,7 @@ In the staging layer of the pipeline, the **Chat Logs** are joined with the **To
 └──────────────────────┬───────────────────┘
                        │
                        ▼
+┌──────────────────────────────────────────┐
 │   BigQuery (Data Warehouse) via Bruin    │
 │  - Staging layer (cleaning data)         │
 │  - Reporting layer (agg. daily/monthly)  │
@@ -68,8 +70,9 @@ In the staging layer of the pipeline, the **Chat Logs** are joined with the **To
                        ▼
 ┌──────────────────────────────────────────┐
 │         Dashboard (Looker Studio)        │
-│  - Message volume over time              │
 │  - Active users tracking                 │
+│  - Message volume over time              │
+│  - Conversation analysis                 │
 └──────────────────────────────────────────┘
 ```
 
@@ -173,7 +176,7 @@ The source data resides in a local MySQL/MariaDB Docker container. It is a copy 
 python export_data.py
 ```
 
-This script extracts user chat logs, groups them by month into CSV files (e.g., `2025-05.csv`), and generates a `topic_lookup.csv` file. I have uploaded them to the project github repository under `data/` directory to support reproducing the same results.
+This script extracts user chat logs, groups them by month into CSV files (e.g., `2025-05.csv`), and generates a `topic_lookup.csv` file. I have uploaded them to the project github repository under `data/` directory to support reproducing the project.
 
 ## Uploading Data to GCS (Automated via Bruin)
 
@@ -182,7 +185,7 @@ This is handled automatically by the Bruin pipeline!
 
 When you trigger the Bruin pipeline, the `upload_to_gcs.py` Python asset runs the `upload_to_gcs.sh` bash script underneath as the first ingestion step. It pulls the data directly from the GitHub repository `data/` directory and uploads each file to `gs://<BUCKET_NAME>/data/` automatically. 
 
-If a file already exists, the script will smartly skip downloading and uploading it. If you trigger the pipeline with `--full-refresh`, it will force an overwrite automatically.
+If any of the files already exists, the script will smartly skip downloading and uploading the files.
 
 ---
 
@@ -198,7 +201,7 @@ curl -LsSf https://getbruin.com/install/cli | sh
 # Verify installation
 bruin -v
 ```
-*(Optional)* Install the Bruin IDE Extension in VS Code or Cursor.
+*(Optional)* Install the Bruin IDE Extension in VS Code or Cursor, see [Bruin MCP](https://getbruin.com/docs/bruin/getting-started/bruin-mcp.html).
 
 ### 2. Validating the Pipeline
 Before running, you can validate your pipeline's SQL, Python, and YAML assets for syntax and dependency errors:
@@ -212,13 +215,15 @@ bruin validate ./pipeline/pipeline.yml
 ### 3. Running the Pipeline
 To run the full end-to-end pipeline (ingestion -> staging -> reports) for a specific date range, use the `bruin run` command:
 ```bash
-# Run the pipeline for a specific date range
+# Run the pipeline for a specific date range with full refresh
 bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2026-01-01 --end-date 2026-02-01
-# full-refresh
+# Load all data with full refresh
 bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2025-01-01
 # full-refresh with variable
 bruin run ./pipeline/pipeline.yml --full-refresh --start-date 2025-01-01 --var chat_types='["free", "assessment_test"]'
 ```
+
+In Bruin, the --full-refresh flag is used to ignore existing data and rebuild an asset (or your entire pipeline) from scratch. It is also needed for the first run to create the assets.
 
 The first step of the pipeline automatically executes `upload_to_gcs.py`, which pulls the CSVs from GitHub and uploads them to your GCS Bucket as part of the ingestion phase. Because it's running with `--full-refresh`, all data will be forcefully re-uploaded and replaced.
 
@@ -232,12 +237,21 @@ bruin query --connection bigquery-default --query "SELECT * FROM chat_analysis_2
 bruin query --connection bigquery-default --query "SELECT MIN(created_at), MAX(created_at) FROM chat_analysis_2026_dataset.staging_chats"
 
 # check row counts, should be the same!
-bruin query --connection bigquery-default --query "SELECT count(*)  FROM chat_analysis_2026_dataset.staging_chats"
-bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT)  FROM chat_analysis_2026_dataset.reports_chats_report_daily"
-bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT) FROM chat_analysis_2026_dataset.reports_chats_report_monthly"
+bruin query --connection bigquery-default --query "SELECT count(*)  staging_chats FROM chat_analysis_2026_dataset.staging_chats"
+bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT)  reports_chats_report_daily FROM chat_analysis_2026_dataset.reports_chats_report_daily"
+bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT) reports_chats_report_monthly FROM chat_analysis_2026_dataset.reports_chats_report_monthly"
+bruin query --connection bigquery-default --query "SELECT count(*) reports_chats_report_convo from chat_analysis_2026_dataset.reports_chats_report_convo limit 5"
 ```
 
-### Key Commands Reference
+### 5. Pipeline in Antigravity
+![alt text](pipeline_antigravity.png)
+
+### 6. Features
+- **Incremental Processing:** Pipline is parameterized to process only new data (incremental loads) rather than full refreshes.
+- **Data Quality Checks:** Integrated data quality tests before they reach the reporting layer.
+- **CI/CD Integration:** In Bruin Cloud environment updates to github repository automatically trigger code refresh and pipeline run.
+
+### 7. Key Commands Reference
 | Command | Purpose |
 |---------|---------|
 | `bruin validate <path>` | Check syntax and dependencies without running |
@@ -248,21 +262,39 @@ bruin query --connection bigquery-default --query "SELECT sum(MESSAGE_COUNT) FRO
 
 For more advanced deployment instructions and tutorials, check out the `chat_analysis/README.md` included in this repository.
 
+## Deploying to Bruin Cloud
+
+[Bruin Cloud](https://cloud.getbruin.com) is a managed platform for running and monitoring your data pipelines. 
+
+### 1. Repository Integration
+
+1. Link your Git repository in the [Bruin Cloud Console](https://cloud.getbruin.com).
+2. Bruin Cloud automatically detects your `pipeline.yml` file.
+
+### 2. Managed Connections
+
+Configure your connections (e.g., `bigquery-default`) in the Bruin Cloud UI. Paste your `.credentials.json` content directly into the connection settings to avoid committing secrets to Git.
+
+For a complete walkthrough, see the [Deploying to Bruin Cloud](https://github.com/DataTalksClub/data-engineering-zoomcamp/blob/main/05-data-platforms/notes/05-bruin-cloud.md).
+
 ## Dashboard & Optimizations
 
 ### Data Warehouse Optimizations
 To ensure cost-efficiency and fast query performance in BigQuery, the resulting reporting tables are optimized using:
 - **Partitioning:** The `staging_chats`, `reporting_chats_report_daily`, `reporting_chats_report_monthly`, and `reports_chats_report_convo` tables are partitioned by their respective date or timestamp columns (`created_at`, `report_day`, `report_month`) to limit the amount of data scanned.
-- **Clustering:** The tables are clustered by `` `user` `` and `topic` fields (and additionally `conversation_id` for the conversations report) for faster grouped aggregations by these dimensions.
+- **Clustering:** The tables are clustered by `user` and `topic` fields (and additionally `conversation_id` for the conversations report) for faster grouped aggregations by these dimensions.
 
 ### Dashboard
 *[Looker Studio dashboard](https://lookerstudio.google.com/reporting/a90b07ea-d6c8-475e-8c1c-0d5274c46b9a)*
 
 The dashboard visualizes:
-- **Active User Trends:** Line charts showing the growth or retention of active users interacting with the chatbot over time.
-- **Conversation Insights:** Visualizations revealing average conversation length, messages per session, and topic-specific interaction depth.
+- **Active User Trends:** Line charts showing number of active users interacting with the chatbot over time.
+- **Messages:** Pie charts showing number of messages per user, and a stack bar chart showing number of messages per month for each user.
+- **Conversation Insights:** A table with conversations filtered by date, user, and topic.
+
+![alt text](dashboard.png)
 
 ## Future Improvements
-- **Incremental Processing:** Parameterize the pipeline to only process new data (incremental loads) rather than full refreshes.
-- **Data Quality Checks:** Integrate automated data quality testing on the staging models before they reach the reporting layer.
-- **CI/CD Integration:** Set up GitHub Actions to automatically run `bruin validate` and deploy infrastructure changes via Terraform on pull requests.
+- expand reports to include more insights, e.g. add report with conversation classification, e.g. [learn, fun, other…]
+- adapt Alexey's [chatgpt-data-viewer](https://github.com/alexeygrigorev/chatgpt-data-viewer) to browse chat messages
+- add connectors to source live data from production mysql database and/or the application API, currently data is served in scrubbed csv files due to privacy concerns
