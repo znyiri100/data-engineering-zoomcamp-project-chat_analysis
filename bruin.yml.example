@@ -1,0 +1,17 @@
+default_environment: default
+environments:
+    default:
+        connections:
+            google_cloud_platform:
+                - location: US
+                  name: bigquery-default
+                  project_id: chat-analysis-2026
+                  service_account_file: /home/me/tmp/DataTalks/znyiri100/data-engineering-zoomcamp-project-chat_analysis/.credentials.json
+            duckdb:
+                - name: duckdb-default
+                  path: /home/me/tmp/DataTalks/znyiri100/data-engineering-zoomcamp-project-chat_analysis/duckdb.db
+            generic:
+                - name: GCS_BUCKET
+                  value: "chat-analysis-2026_bucket"
+                - name: PROJECT_ID
+                  value: "chat-analysis-2026"
